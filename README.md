@@ -54,7 +54,6 @@ Business Understanding → ETL → Analysis → Dashboard → Automation
 03_bi_and_automation/
 data/
 docs/
-assets/
 ```
 
 ---
