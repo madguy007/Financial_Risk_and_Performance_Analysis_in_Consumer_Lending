@@ -137,13 +137,14 @@ Provide **real-time explanation** for a given loan using AI
 
 ## 📸 Workflow
 
-![Loan Explainer Workflow](./screenshots/loan_decision_explainer.png)
+![Loan Explainer Output](./screenshots/loan_decision_explainer_output.png)
 
 ---
 
 ## 📊 API Output (Postman)
 
-![Loan Explainer Output](./screenshots/loan_decision_explainer_output.png)
+![Loan Explainer Workflow](./screenshots/loan_decision_explainer.png)
+
 
 ---
 
