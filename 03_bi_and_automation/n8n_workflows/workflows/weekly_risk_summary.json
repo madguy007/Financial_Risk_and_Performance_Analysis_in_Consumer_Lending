@@ -1,0 +1,265 @@
+{
+  "name": "Risk_check_2",
+  "nodes": [
+    {
+      "parameters": {
+        "promptType": "=define",
+        "text": "=You are a senior financial risk analyst.\n\nHere is the loan portfolio data:\n\nTotal Loans: {{$json.total_loans}}\nDefault Rate: {{$json.bad_loan_pct}}%\nHigh Risk Percentage with grade (D,E,F): {{$json.high_risk_pct}}%\n\nRegion-wise Default Rates:\n{{ JSON.stringify($json.region_risk) }}\n\nINSTRUCTIONS:\n- Determine overall risk level:\n  - If default rate > 12% → High\n  - If 8–12% → Medium\n  - Else → Low\n- Identify the most risky region using ONLY the given data\n- Sort regions by default_pct in descending order\n- Pick the highest as most risky\n- Show top 5 regions with their default percentages\n- Explain risk using only:\n  - Default rate\n  - High risk percentage\n  - Region concentration\n- DO NOT mention trends like increase/decrease\n- DO NOT invent any values or regions\n\nSTRICT RULES:\n- Use ONLY the provided data\n- Do NOT hallucinate\n- Output ONLY valid HTML (no markdown, no extra text)\n\nFORMAT:\n\n<h2 style=\"color:#2c3e50;\">📊 Weekly Loan Risk Summary</h2>\n\n<p><strong>Overall Risk Level:</strong> <span style=\"color:red;\">...</span></p>\n\n<h3>Key Metrics</h3>\n<ul>\n<li><strong>Total Loans:</strong> {{$json.total_loans}}</li>\n<li><strong>Default Rate:</strong> {{$json.bad_loan_pct}}%</li>\n<li><strong>High Risk Percentage:</strong> {{$json.high_risk_pct}}%</li>\n</ul>\n\n<h3>Most Risky Region</h3>\n<p>...</p>\n\n<h3>Key Insight</h3>\n<p>...</p>\n\n<h3>Regional Default Rates</h3>\n<ul>\n<li>Region - Default %</li>\n</ul>\n\n<hr>\n\n<p style=\"font-size:12px;color:gray;\">\nThis is an automated risk report generated via n8n + GenAI pipeline.\n</p>",
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        1904,
+        0
+      ],
+      "id": "6e24df78-7aa3-4821-84c6-5d1b695538df",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "model": "llama-3.1-8b-instant",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        1904,
+        176
+      ],
+      "id": "93c5f6ce-91e2-47e1-9345-93665c5ed03d",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "YlchpkGKFg75CIkR",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const interest = $items(\"avg interest rate by grade\", 0).map(i => i.json);\nconst core = interest[0];\nconst region = $items(\"Region wise Default rate %\", 0).map(i => i.json);\n\n// convert numbers + clean region\nconst cleanedRegion = region.map(r => ({\n  region: r.region,\n  default_pct: Number(r.default_pct)\n}));\n\nreturn [{\n  json: {\n    total_loans: Number(core.total_loans),\n    bad_loan_pct: Number(core.bad_loan_pct),\n    high_risk_pct: Number(core.high_risk_pct),\n    avg_interest_rate: Number(core.avg_interest_rate),\n    region_risk: cleanedRegion\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1664,
+        0
+      ],
+      "id": "4b7c7bbe-e36a-4b62-a120-152655d80da4",
+      "name": "Code in JavaScript",
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "fromEmail": "madandahiphale007@gmail.com",
+        "toEmail": "madandahiphale007@gmail.com",
+        "subject": "Weekly Loan Risk Summary",
+        "html": "={{ $json.text }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        2256,
+        0
+      ],
+      "id": "dff124e8-3d59-46e5-9ff2-e63b3a32309d",
+      "name": "Send an Email",
+      "webhookId": "1a55123a-3966-4b7d-9144-22434862dd9b",
+      "credentials": {
+        "smtp": {
+          "id": "pZQtOY3kfKW2y00Z",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n    grade,\n    ROUND(AVG(interest_rate), 2) AS avg_interest_rate\nFROM loan_cleaned\nGROUP BY grade\nORDER BY grade;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1200,
+        0
+      ],
+      "id": "cfe86da9-3932-4a05-8db2-d7fe783b5a8e",
+      "name": "Execute a SQL query1",
+      "credentials": {
+        "postgres": {
+          "id": "76KIauc3Xnmx8Arl",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n    COUNT(*) AS total_loans,\n    \n    ROUND(100.0 * SUM(CASE WHEN loan_condition = 'BAD LOAN' THEN 1 ELSE 0 END) / COUNT(*), 2) AS bad_loan_pct,\n    \n    ROUND(100.0 * SUM(CASE WHEN grade IN ('D','E','F') THEN 1 ELSE 0 END) / COUNT(*), 2) AS high_risk_pct,\n    \n    ROUND(AVG(interest_rate), 2) AS avg_interest_rate\nFROM loan_cleaned;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        992,
+        0
+      ],
+      "id": "a312d039-ac3e-4483-9973-f0250e7b776b",
+      "name": "avg interest rate by grade",
+      "credentials": {
+        "postgres": {
+          "id": "76KIauc3Xnmx8Arl",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n    region,\n    ROUND(\n        100.0 * SUM(CASE WHEN loan_condition = 'BAD LOAN' THEN 1 ELSE 0 END) \n        / COUNT(*), 2\n    ) AS default_pct\nFROM loan_cleaned\nGROUP BY region\nORDER BY default_pct DESC;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1408,
+        0
+      ],
+      "id": "91d51b82-a247-4299-9908-d35e4993b449",
+      "name": "Region wise Default rate %",
+      "executeOnce": true,
+      "credentials": {
+        "postgres": {
+          "id": "76KIauc3Xnmx8Arl",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                1
+              ],
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        736,
+        0
+      ],
+      "id": "2b30d8d6-2099-4559-bd34-fddd458fd2c0",
+      "name": "Schedule Trigger"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Send an Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query1": {
+      "main": [
+        [
+          {
+            "node": "Region wise Default rate %",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "avg interest rate by grade": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Region wise Default rate %": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "avg interest rate by grade",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "2a3508e1-9070-4aab-ac70-17e46d6ec33c",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "beb6ebea01647b6e78460ed44665b0ce35e6996221a38e9c9a5b1eff29c815b2"
+  },
+  "id": "dnmh5p0fF6Avassa",
+  "tags": [
+    {
+      "updatedAt": "2026-04-22T12:31:32.814Z",
+      "createdAt": "2026-04-22T12:31:32.814Z",
+      "id": "lRosbVGQ5HLJkbyh",
+      "name": "Fintec_analysis"
+    }
+  ]
+}

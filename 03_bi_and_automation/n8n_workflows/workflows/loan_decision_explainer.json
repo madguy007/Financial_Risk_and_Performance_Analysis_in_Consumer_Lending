@@ -1,0 +1,194 @@
+{
+  "name": "loan_id_analysis",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "loan-explain",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "ebc9adc4-1f83-4afa-8129-1ae52ca2eef6",
+      "name": "Webhook",
+      "webhookId": "61758aa3-f599-4d4d-a6ff-7ae7913bd434"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n    id,\n    grade,\n    interest_rate,\n    dti,\n    income_cat,\n    emp_length_int,\n    purpose,\n    loan_condition\nFROM loan_cleaned\nWHERE id = {{ $json.body.loan_id }}\nLIMIT 1;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        208,
+        0
+      ],
+      "id": "9f2183e9-434f-46b0-8ad5-4b8ebe90a95b",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "postgres": {
+          "id": "76KIauc3Xnmx8Arl",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const loan = $input.first().json;\n\nlet risk_factors = [];\n\n// Rule-based risk detection\n\nif (loan.dti > 30) {\n  risk_factors.push(\"High debt-to-income ratio\");\n}\n\nif (loan.interest_rate > 15) {\n  risk_factors.push(\"High interest rate\");\n}\n\nif (loan.income_cat === \"Low\") {\n  risk_factors.push(\"Low income category\");\n}\n\nif (loan.emp_length_int < 2) {\n  risk_factors.push(\"Short employment history\");\n}\n\nif ([\"D\", \"E\", \"F\"].includes(loan.grade)) {\n  risk_factors.push(\"High-risk loan grade\");\n}\n\n// Return structured output\nreturn [{\n  json: {\n    loan_id: loan.id,\n    loan_status: loan.loan_condition,\n    risk_factors: risk_factors,\n    loan_data: loan\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        0
+      ],
+      "id": "0a3d7916-c719-40f8-bc2d-fb58289daa8c",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a financial risk analyst.\n\nLoan status: {{$json.loan_status}}\n\nRisk factors:\n{{$json.risk_factors.join(\", \")}}\n\nLoan details:\n- DTI: {{$json.loan_data.dti}}\n- Interest Rate: {{$json.loan_data.interest_rate}}\n- Income Category: {{$json.loan_data.income_cat}}\n- Employment Length: {{$json.loan_data.emp_length_int}} years\n- Grade: {{$json.loan_data.grade}}\n\nExplain briefly (2–3 sentences) why this loan is {{$json.loan_status}}.\nUse simple, clear business language.",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You are an expert financial risk analyst who explains decisions clearly and concisely."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        672,
+        0
+      ],
+      "id": "fa2b67fa-a2c4-4de9-ad14-12dc2d1c877c",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "meta-llama/llama-3-8b-instruct",
+          "mode": "list",
+          "cachedResultName": "meta-llama/llama-3-8b-instruct"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        672,
+        192
+      ],
+      "id": "4cbbc622-6f4b-4e2c-819e-9584a03f76ed",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "33tDyzuGKKzS1tN3",
+          "name": "OpenAI account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const llm = $input.first().json;\nconst risk = $node[\"Code in JavaScript\"].json;\n\nreturn [{\n  json: {\n    loan_id: Number(risk.loan_id),\n    status: risk.loan_status,\n    explanation: llm.text || llm.output || JSON.stringify(llm)\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1024,
+        0
+      ],
+      "id": "e624ad13-05ad-4353-b581-393d26109a63",
+      "name": "Code in JavaScript1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "ea00cc77-19de-4315-b0c6-33b39d08147b",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "beb6ebea01647b6e78460ed44665b0ce35e6996221a38e9c9a5b1eff29c815b2"
+  },
+  "id": "INp01ZtuPVHN1awV",
+  "tags": [
+    {
+      "updatedAt": "2026-04-22T12:31:32.814Z",
+      "createdAt": "2026-04-22T12:31:32.814Z",
+      "id": "lRosbVGQ5HLJkbyh",
+      "name": "Fintec_analysis"
+    }
+  ]
+}
