@@ -121,7 +121,7 @@ Key Analysis:
 ![Executive Summary](screenshots/executive_summary.png)
 
 ### Deep Dive Analysis
-![Deep Dive](screenshots/deep_dive_analysis.png)
+![Deep Dive](screenshots/deep_dive_analysi.png)
 
 ### Trends & Forecasting
 ![Trends](screenshots/trends_forecasting.png)
