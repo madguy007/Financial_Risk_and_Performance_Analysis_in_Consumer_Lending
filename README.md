@@ -160,4 +160,4 @@ docs/
 ## 👤 Author
 
 Madan Dahiphale
-Aspiring Data Scientist | Data Analyst | ML Enthusiast
+Data Scientist | Data Analyst | ML Enthusiast
